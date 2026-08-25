@@ -936,26 +936,58 @@ function renderLegacyRecords(){
 function renderLegacyRoleStats(mode){
   const teams1=S.teams.filter(t=>t.div===1);
   const allPlayers=teams1.flatMap(t=>t.players.map(p=>({...p,teamName:t.name})));
-  const ROLES=[{key:'starter',label:'스타터',icon:'🏁'},{key:'chaser',label:'체이저',icon:'🔄'},{key:'relief',label:'릴리프',icon:'💪'},{key:'closer',label:'클로저',icon:'🔒'},{key:'opener',label:'오프너',icon:'⚡'},{key:'perfecter',label:'퍼펙터',icon:'✨'}];
+  const ROLES=[
+    {key:'starter',label:'스타터',icon:'🏁'},
+    {key:'chaser',label:'체이저',icon:'🔄'},
+    {key:'relief',label:'릴리프',icon:'💪'},
+    {key:'closer',label:'클로저',icon:'🔒'},
+    {key:'opener',label:'오프너',icon:'⚡'},
+    {key:'perfecter',label:'퍼펙터',icon:'✨'},
+  ];
+  if(!window._rsSortKey)window._rsSortKey='total';
+  if(!window._rsSortDir)window._rsSortDir='desc';
+
   const rows=allPlayers.map(p=>{
     const r27=calcRoleStats(p.id);
     const r26=getLegacyRoleStats(p.id)||{starter:0,chaser:0,relief:0,closer:0,opener:0,perfecter:0};
-    const rAll={};ROLES.forEach(({key})=>rAll[key]=(r27[key]||0)+(r26[key]||0));
-    return{...p,r27,r26,rAll};
+    const rAll={};
+    ROLES.forEach(({key})=>rAll[key]=(r27[key]||0)+(r26[key]||0));
+    const src=mode==='all'?rAll:mode==='2027'?r27:r26;
+    const total=ROLES.reduce((s,{key})=>s+(src[key]||0),0);
+    return{...p,r27,r26,rAll,_src:src,_total:total};
   });
-  const src=mode==='all'?'rAll':mode==='2027'?'r27':'r26';
-  rows.sort((a,b)=>ROLES.reduce((s,{key})=>s+b[src][key],0)-ROLES.reduce((s,{key})=>s+a[src][key],0));
-  return`<div style="overflow-x:auto"><table class="qr-tbl" style="min-width:700px">
-    <thead><tr><th>선수명</th>${ROLES.map(r=>`<th>${r.icon} ${r.label}</th>`).join('')}<th>합계</th></tr></thead>
-    <tbody>${rows.map(r=>{
-      const d=r[src];
-      const total=ROLES.reduce((s,{key})=>s+(d[key]||0),0);
-      return`<tr><td><span style="font-weight:600;color:var(--ac)">${r.name}</span><span style="font-size:10px;color:var(--mt);margin-left:3px">${r.num}번·${r.teamName}</span></td>${ROLES.map(({key})=>`<td style="text-align:center;font-weight:${d[key]>0?'700':'400'};color:${d[key]>0?'var(--ac)':'var(--mt)'}">${d[key]||0}</td>`).join('')}<td style="text-align:center;font-weight:700">${total}</td></tr>`;
-    }).join('')}</tbody></table></div>`;
-}
 
-// ── 역대 에이스 결정전 ──
-var _legacyAceView='team';
+  // 정렬
+  rows.sort((a,b)=>{
+    const ak=_rsSortKey==='total'?a._total:(a._src[_rsSortKey]||0);
+    const bk=_rsSortKey==='total'?b._total:(b._src[_rsSortKey]||0);
+    if(bk!==ak)return _rsSortDir==='desc'?bk-ak:ak-bk;
+    return b._total-a._total;
+  });
+
+  const th=(key,label)=>{
+    const active=_rsSortKey===key;
+    const arrow=active?(_rsSortDir==='asc'?' ↑':' ↓'):'';
+    return `<th onclick="window._rsSortKey='${key}';window._rsSortDir=(_rsSortKey==='${key}'&&_rsSortDir==='desc')?'asc':'desc';window._rsSortKey='${key}';renderLegacyRecords();"
+      style="cursor:pointer;white-space:nowrap;${active?'color:var(--ac)':''}">${label}${arrow}</th>`;
+  };
+
+  return`<div style="overflow-x:auto"><table class="qr-tbl" style="min-width:700px">
+    <thead><tr><th>선수명</th>
+      ${ROLES.map(r=>th(r.key,r.icon+' '+r.label)).join('')}
+      ${th('total','합계')}
+    </tr></thead>
+    <tbody>${rows.map(r=>{
+      const d=r._src;
+      return`<tr>
+        <td><span style="font-weight:600;color:var(--ac)">${r.name}</span>
+          <span style="font-size:10px;color:var(--mt);margin-left:3px">${r.num}번·${r.teamName}</span></td>
+        ${ROLES.map(({key})=>`<td style="text-align:center;font-weight:${(d[key]||0)>0?'700':'400'};color:${(d[key]||0)>0?'var(--ac)':'var(--mt)'}">${d[key]||0}</td>`).join('')}
+        <td style="text-align:center;font-weight:700;color:${r._total>0?'var(--tx)':'var(--mt)'}">${r._total}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
 
 function renderLegacyAce(mode){
   const btnSt=(a)=>`background:${a?'var(--ac)':'transparent'};color:${a?'#000':'var(--mt)'};border:1px solid ${a?'var(--ac)':'var(--bd)'};border-radius:8px;padding:7px 16px;font-family:var(--font);font-size:12px;font-weight:${a?'700':'500'};cursor:pointer`;
@@ -964,37 +996,103 @@ function renderLegacyAce(mode){
     <button onclick="setLegacyAceView('player')" style="${btnSt(_legacyAceView==='player')}">선수</button>
   </div>`;
 
+  if(!window._aceLSort)window._aceLSort='wins';
+  if(!window._aceLDir)window._aceLDir='desc';
+
+  const th=(key,label)=>{
+    const active=_aceLSort===key;
+    const arrow=active?(_aceLDir==='asc'?' ↑':' ↓'):'';
+    const asc=['avgTime','apps26'].includes(key);
+    return `<th onclick="
+      if(window._aceLSort==='${key}'){window._aceLDir=window._aceLDir==='asc'?'desc':'asc';}
+      else{window._aceLSort='${key}';window._aceLDir='${asc?'asc':'desc'}';}
+      renderLegacyRecords();"
+      style="cursor:pointer;white-space:nowrap;${active?'color:var(--ac)':''}">${label}${arrow}</th>`;
+  };
+
+  const sortFn=(rows)=>rows.slice().sort((a,b)=>{
+    const av=a[_aceLSort]??(( _aceLSort==='avgTime')?9999:0);
+    const bv=b[_aceLSort]??(( _aceLSort==='avgTime')?9999:0);
+    if(av===bv)return b.wins-a.wins;
+    return _aceLDir==='desc'?bv-av:av-bv;
+  });
+
   if(_legacyAceView==='team'){
     const teams=S.teams.filter(t=>t.div===1);
-    const rows=teams.map(t=>{
+    const rawRows=teams.map(t=>{
       const all=getAceTeamStatsAll(t.id);
-      return{name:t.name,all,
-        wr27:all.apps27?((all.wins27/all.apps27)*100).toFixed(1)+'%':'-',
-        wr26:all.apps26?((all.wins26/all.apps26)*100).toFixed(1)+'%':'-',
-        wrAll:all.apps?((all.wins/all.apps)*100).toFixed(1)+'%':'-'};
-    }).sort((a,b)=>b.all.wins-a.all.wins);
-    const cSt=(v,t)=>t?('font-weight:700;color:'+(v/t>0.5?'var(--grn)':v/t<0.5?'var(--red)':'var(--mt)')):'color:var(--mt)';
+      return{
+        name:t.name,
+        apps:all.apps, wins:all.wins, losses:all.apps-all.wins,
+        winRate:all.apps?+((all.wins/all.apps)*100).toFixed(1):null,
+        apps27:all.apps27,wins27:all.wins27,
+        apps26:all.apps26,wins26:all.wins26,
+        wr27:all.apps27?+((all.wins27/all.apps27)*100).toFixed(1):null,
+        wr26:all.apps26?+((all.wins26/all.apps26)*100).toFixed(1):null,
+      };
+    });
+    const rows=sortFn(rawRows.filter(r=>r.apps>0));
+    const pct=v=>v!=null?v.toFixed(1)+'%':'-';
+    const wCol=(v,t)=>t?('font-weight:700;color:'+(v/t>0.5?'var(--grn)':v/t<0.5?'var(--red)':'var(--mt)')):'color:var(--mt)';
     return vBar+`<div style="overflow-x:auto"><table class="qr-tbl">
-      <thead><tr><th>팀명</th><th>누적출전</th><th>누적승</th><th>누적승률</th><th>2027출전</th><th>2027승</th><th>2027승률</th>${S.legacyData?'<th>2026출전</th><th>2026승</th><th>2026승률</th>':''}</tr></thead>
-      <tbody>${rows.map(r=>`<tr><td style="font-weight:600">${r.name}</td>
-        <td>${r.all.apps}</td><td style="${cSt(r.all.wins,r.all.apps)}">${r.all.wins}</td><td>${r.wrAll}</td>
-        <td>${r.all.apps27}</td><td>${r.all.wins27}</td><td>${r.wr27}</td>
-        ${S.legacyData?`<td>${r.all.apps26}</td><td>${r.all.wins26}</td><td>${r.wr26}</td>`:''}</tr>`).join('')}</tbody>
+      <thead><tr>
+        <th>팀명</th>
+        ${th('apps','누적출전')}${th('wins','누적승')}${th('losses','누적패')}${th('winRate','누적승률')}
+        ${th('apps27','2027출전')}${th('wins27','2027승')}${th('wr27','2027승률')}
+        ${S.legacyData?`${th('apps26','2026출전')}${th('wins26','2026승')}${th('wr26','2026승률')}`:''}
+      </tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td style="font-weight:600">${r.name}</td>
+        <td>${r.apps}</td>
+        <td style="${wCol(r.wins,r.apps)}">${r.wins}</td>
+        <td style="${wCol(r.losses,r.apps)}">${r.losses}</td>
+        <td style="${wCol(r.wins,r.apps)}">${pct(r.winRate)}</td>
+        <td>${r.apps27}</td>
+        <td style="${wCol(r.wins27,r.apps27)}">${r.wins27}</td>
+        <td style="${wCol(r.wins27,r.apps27)}">${pct(r.wr27)}</td>
+        ${S.legacyData?`<td>${r.apps26}</td><td>${r.wins26}</td><td>${pct(r.wr26)}</td>`:''}
+      </tr>`).join('')}</tbody>
     </table></div>`;
   }
 
+  // 선수 탭
   const teams1=S.teams.filter(t=>t.div===1);
   const players=teams1.flatMap(t=>t.players.map(p=>({...p,teamName:t.name})));
-  const rows=players.map(p=>{
+  const rawRows=players.map(p=>{
     const all=getAceStatsAll(p.id);
-    return{...p,all,wr27:all.apps27?((all.wins27/all.apps27)*100).toFixed(1)+'%':'-',wrAll:all.apps?((all.wins/all.apps)*100).toFixed(1)+'%':'-'};
-  }).filter(r=>r.all.apps>0).sort((a,b)=>b.all.wins-a.all.wins);
+    return{
+      ...p,
+      apps:all.apps, wins:all.wins, losses:all.apps-all.wins,
+      winRate:all.apps?+((all.wins/all.apps)*100).toFixed(1):null,
+      avgTime:all.avgTime,
+      apps27:all.apps27,wins27:all.wins27,
+      apps26:all.apps26,wins26:all.wins26,
+      wr27:all.apps27?+((all.wins27/all.apps27)*100).toFixed(1):null,
+    };
+  }).filter(r=>r.apps>0);
+  const rows=sortFn(rawRows);
+  const pct=v=>v!=null?v.toFixed(1)+'%':'-';
+    const wCol=(v,t)=>t?('font-weight:700;color:'+(v/t>0.5?'var(--grn)':v/t<0.5?'var(--red)':'var(--mt)')):'color:var(--mt)';
+
   return vBar+`<div style="overflow-x:auto"><table class="qr-tbl">
-    <thead><tr><th>선수명</th><th>누적출전</th><th>누적승</th><th>누적승률</th><th>2027출전</th><th>2027승</th><th>2027승률</th><th>평균기록</th></tr></thead>
-    <tbody>${rows.map(r=>`<tr><td><span style="font-weight:600;color:var(--ac)">${r.name}</span><span style="font-size:10px;color:var(--mt);margin-left:3px">${r.num}번·${r.teamName}</span></td>
-      <td>${r.all.apps}</td><td style="font-weight:700;color:${r.all.apps&&r.all.wins/r.all.apps>0.5?'var(--grn)':'var(--red)'}">${r.all.wins}</td><td>${r.wrAll}</td>
-      <td>${r.all.apps27}</td><td>${r.all.wins27}</td><td>${r.wr27}</td>
-      <td class="recc">${r.all.avgTime!=null?fmt(r.all.avgTime):'-'}</td></tr>`).join('')}</tbody>
+    <thead><tr>
+      <th>선수명</th>
+      ${th('apps','누적출전')}${th('wins','누적승')}${th('losses','누적패')}${th('winRate','누적승률')}
+      ${th('apps27','2027출전')}${th('wins27','2027승')}${th('wr27','2027승률')}
+      ${th('avgTime','평균기록')}
+    </tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td><span style="font-weight:600;color:var(--ac)">${r.name}</span>
+        <span style="font-size:10px;color:var(--mt);margin-left:3px">${r.num}번·${r.teamName}</span></td>
+      <td>${r.apps}</td>
+      <td style="${wCol(r.wins,r.apps)}">${r.wins}</td>
+      <td style="${wCol(r.losses,r.apps)}">${r.losses}</td>
+      <td style="${wCol(r.wins,r.apps)}">${pct(r.winRate)}</td>
+      <td>${r.apps27}</td>
+      <td style="${wCol(r.wins27,r.apps27)}">${r.wins27}</td>
+      <td style="${wCol(r.wins27,r.apps27)}">${pct(r.wr27)}</td>
+      <td class="recc">${r.avgTime!=null?fmt(r.avgTime):'-'}</td>
+    </tr>`).join('')}</tbody>
   </table></div>`;
 }
 
@@ -4008,14 +4106,14 @@ function calcTeamSituationStats(tid){
 
 function getAceStats(pid){
   let wins=0,losses=0,times=[],mis=0,best=null;
-  const allP=S.teams.flatMap(t=>t.players);
-  for(const m of S.matches){
-    if(!m.result?.final)continue;
-    const h=S.teams.find(t=>t.id===m.homeId),a=S.teams.find(t=>t.id===m.awayId);
-    if(!h||!a)continue;
-    const fn=m.result.final;
-    const hAce=fn.homeAce?h.players.find(p=>p.id===fn.homeAce||p.num===fn.homeAce):null;
-    const aAce=fn.awayAce?a.players.find(p=>p.id===fn.awayAce||p.num===fn.awayAce):null;
+  for(const g of allGames()){
+    if(!g.result?.final)continue;
+    const fn=g.result.final;
+    const hTeam=S.teams.find(t=>t.id===g.homeId);
+    const aTeam=S.teams.find(t=>t.id===g.awayId);
+    if(!hTeam||!aTeam)continue;
+    const hAce=fn.homeAce?hTeam.players.find(p=>p.id===fn.homeAce||p.num===fn.homeAce):null;
+    const aAce=fn.awayAce?aTeam.players.find(p=>p.id===fn.awayAce||p.num===fn.awayAce):null;
     const amH=hAce?.id===pid, amA=aAce?.id===pid;
     if(!amH&&!amA)continue;
     if(fn.homeSec===null||fn.awaySec===null)continue;
@@ -4031,10 +4129,9 @@ function getAceStats(pid){
   const apps=wins+losses;
   const avgTime=times.length?+(times.reduce((a,b)=>a+b,0)/times.length).toFixed(2):null;
   const avgMis=apps?+(mis/apps).toFixed(2):0;
-  const wr=apps?+(wins/apps*100).toFixed(1):null;
-  return{wins,losses,apps,avgTime,best,totalMis:mis,avgMis,winRate:wr};
+  const winRate=apps?+(wins/apps*100).toFixed(1):null;
+  return{wins,losses,apps,avgTime,best,totalMis:mis,avgMis,winRate,times};
 }
-
 
 function getAceTeamStats(tid){
   let wins=0,losses=0,times=[],mis=0,best=null;
@@ -4266,7 +4363,7 @@ function renderSituation(){
   renderSituationBody();
 }
 
-function setSituTP(tp){_situTP=tp;renderSituationBody();}
+function setSituTP(tp){_situTP=tp;renderSituation();}
 
 function renderSituationBody(){
   const el=document.getElementById('situation-body');
