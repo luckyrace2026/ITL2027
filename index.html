@@ -710,26 +710,31 @@ function renderLegacyRecords(){
   if(typeof _legacySortDir==='undefined')window._legacySortDir='desc';
   if(typeof _legacyView==='undefined')window._legacyView='player'; // 'player' | 'team'
 
-  if(!S.legacyData){
-    el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--mt)">
-      <div style="margin-bottom:16px">2026 시즌 기록이 없습니다.</div>
-      <button onclick="importLegacy2026()" class="btn btn-p">📥 2026 기록 가져오기</button>
-    </div>`;
-    return;
-  }
-
   const btnSt=(active)=>`background:${active?'var(--ac)':'transparent'};color:${active?'#000':'var(--mt)'};border:1px solid ${active?'var(--ac)':'var(--bd)'};border-radius:8px;padding:8px 18px;font-family:var(--font);font-size:13px;font-weight:${active?'700':'500'};cursor:pointer`;
   const tabSt=(active)=>`background:${active?'var(--sf)':'transparent'};color:${active?'var(--ac)':'var(--mt)'};border:none;font-family:var(--font);font-size:13px;font-weight:${active?'700':'500'};padding:8px 16px;border-radius:7px;cursor:pointer`;
-
-  // ── 공통 헤더 ──
   const viewBar=`<div style="display:flex;gap:4px;background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:4px;margin-bottom:16px;flex-wrap:wrap">
     <button onclick="legacySetView('player')" style="${tabSt(_legacyView==='player')}">선수 기록</button>
     <button onclick="legacySetView('team')" style="${tabSt(_legacyView==='team')}">팀 기록</button>
     <button onclick="legacySetView('rolestats')" style="${tabSt(_legacyView==='rolestats')}">역할 스탯</button>
     <button onclick="legacySetView('ace')" style="${tabSt(_legacyView==='ace')}">에이스 결정전</button>
   </div>`;
+  const importBtn=`<button onclick="importLegacy2026()" class="btn btn-g btn-sm" style="float:right">${S.legacyData?'📥 2026 재가져오기':'📥 2026 기록 가져오기'}</button>`;
 
-  const importBtn=`<button onclick="importLegacy2026()" class="btn btn-g btn-sm" style="float:right">📥 2026 재가져오기</button>`;
+  if(_legacyView==='rolestats'){
+    const seasonTabs2=`<div style="display:flex;gap:8px;margin-bottom:12px"><button onclick="legacySetTab('all')" style="${btnSt(_legacyTab==='all')}">2026~2027 누적</button><button onclick="legacySetTab('2027')" style="${btnSt(_legacyTab==='2027')}">2027 시즌</button>${S.legacyData?`<button onclick="legacySetTab('2026')" style="${btnSt(_legacyTab==='2026')}">2026 시즌</button>`:''}</div>`;
+    el.innerHTML=importBtn+viewBar+seasonTabs2+renderLegacyRoleStats(_legacyTab);
+    return;
+  }
+  if(_legacyView==='ace'){
+    const seasonTabs2=`<div style="display:flex;gap:8px;margin-bottom:12px"><button onclick="legacySetTab('all')" style="${btnSt(_legacyTab==='all')}">2026~2027 누적</button><button onclick="legacySetTab('2027')" style="${btnSt(_legacyTab==='2027')}">2027 시즌</button>${S.legacyData?`<button onclick="legacySetTab('2026')" style="${btnSt(_legacyTab==='2026')}">2026 시즌</button>`:''}</div>`;
+    el.innerHTML=importBtn+viewBar+seasonTabs2+renderLegacyAce(_legacyTab);
+    return;
+  }
+  if(!S.legacyData){
+    el.innerHTML=importBtn+viewBar+`<div style="padding:32px;text-align:center;color:var(--mt)"><div style="margin-bottom:16px">2026 시즌 기록이 없습니다.</div><button onclick="importLegacy2026()" class="btn btn-p">📥 2026 기록 가져오기</button></div>`;
+    return;
+  }
+
 
   // ════════════════════
   // 선수 기록
