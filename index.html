@@ -376,15 +376,15 @@ tr:hover td{background:rgba(0,196,255,.025)}
   <div class="hdr">
     <div class="logo">ICE<em>TRACK</em> <span style="font-size:11px;font-weight:500;color:var(--mt);letter-spacing:1px">2027</span></div>
     <nav>
-      <button class="act" onclick="showPage('standings',this)">순위표</button>
       <button onclick="showPage('schedule',this)">경기 일정</button>
+      <button onclick="showPage('standings',this)">순위표</button>
+      <button onclick="showPage('admin',this)">팀 관리</button>
       <button onclick="showPage('special',this)">시즌 특수 기록</button>
       <button onclick="showPage('detail',this)">시즌 세부 기록</button>
       <button onclick="showPage('postseason',this)">포스트시즌</button>
       <button onclick="showPage('allstar',this)">올스타전</button>
       <button onclick="showPage('qrecord',this)">순위 기록</button>
       <button onclick="showPage('legacy',this)">역대 기록</button>
-      <button onclick="showPage('admin',this)">팀 관리</button>
       <button onclick="showPage('settings',this)">설정</button>
     </nav>
     <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
@@ -711,7 +711,7 @@ function obEnterApp(){
   document.getElementById('app').style.display='block';
   saveToCloud();
   startPoll();
-  showPage('standings',document.querySelector('nav button'));
+  showPage('schedule',document.querySelector('nav button'));
 }
 
 function obBackLanding(){
@@ -2327,9 +2327,9 @@ function renderSchedule(){
             if(!g)return'';
             const hT=S.teams.find(t=>t.id===g.homeId),aT=S.teams.find(t=>t.id===g.awayId);
             const done=!!g.result;
-            return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+            return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);min-width:0;overflow:hidden">
               <span style="font-size:11px;color:var(--mt);min-width:52px;font-weight:600">Game ${gi+1}</span>
-              <span style="font-size:13px;font-weight:600;flex:1">${hT?.name||'?'} <span style="color:var(--mt)">vs</span> ${aT?.name||'?'}</span>
+              <span style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${hT?.name||'?'} <span style="color:var(--mt)">vs</span> ${aT?.name||'?'}</span>
               ${done?`<span style="font-size:14px;font-weight:900;color:var(--ac)">${g.result.hScore} : ${g.result.aScore}</span>
                 <span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(0,229,160,.1);color:var(--grn)">완료</span>
                 <button class="btn btn-g btn-sm" onclick="openGameView(${m.no},${gi})">보기</button>
@@ -2414,105 +2414,104 @@ function renderAdmin(){
   const el=document.getElementById('admin-body');
   if(!el)return;
   const teams1=S.teams.filter(t=>t.div===1);
-  el.innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:16px">
+  if(!teams1.length){
+    el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--mt)">
+      <div style="margin-bottom:16px">등록된 팀이 없습니다.</div>
       <button onclick="addTeam()" class="btn btn-p">+ 팀 추가</button>
-      <button onclick="openMatchGen()" class="btn btn-g">📅 경기 일정 생성</button>
+    </div>`;
+    return;
+  }
+  // 선수 선택 드롭다운 옵션 생성 (1~5번 포함, 5번=백업)
+  const numOpts=(t,sel)=>t.players.map(p=>`<option value="${p.num}"${p.num===sel?' selected':''}>${p.num}번 ${p.name}</option>`).join('');
+  el.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <button onclick="addTeam()" class="btn btn-p">+ 팀 추가</button>
     </div>
-    ${teams1.map(t=>`
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-hdr" style="display:flex;align-items:center;justify-content:space-between">
+    <div id="admin-list"></div>`;
+  document.getElementById('admin-list').innerHTML=teams1.map(t=>{
+    const order=t.order||[1,2,3,4];
+    return`<div class="card" style="margin-bottom:13px">
+      <div class="card-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div class="card-ttl">${t.name}</div>
-        <div style="display:flex;gap:6px">
-          <button onclick="editTeamName('${t.id}')" class="btn btn-g btn-sm">팀명 수정</button>
-          <button onclick="addPlayer('${t.id}')" class="btn btn-p btn-sm">+ 선수</button>
-          <button onclick="deleteTeam('${t.id}')" class="btn btn-sm" style="background:rgba(255,77,109,.12);color:var(--red);border:1px solid rgba(255,77,109,.3)">삭제</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:var(--mt)">팀명 변경</span>
+          <input class="inp" style="width:160px" value="${t.name}" onchange="renameTm27('${t.id}',this.value)">
         </div>
       </div>
       <div class="card-body">
-        ${t.players.length?`<div style="display:flex;flex-wrap:wrap;gap:8px">
+        <div class="section-lbl" style="margin-bottom:10px">선발 출전 순서</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+          ${[0,1,2,3].map(ri=>`
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:var(--mt);font-weight:600">R${ri+1}</span>
+              <select class="sel" style="font-size:12px;padding:6px 10px"
+                onchange="setOrder27('${t.id}',${ri},parseInt(this.value))">
+                ${numOpts(t,order[ri])}
+              </select>
+              ${ri<3?`<span style="color:var(--bd);font-size:16px">—</span>`:''}
+            </div>`).join('')}
+          <span style="font-size:11px;color:var(--mt);margin-left:4px">순으로 출전</span>
+        </div>
+        <div class="section-lbl">선수 목록 및 이름 변경</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:9px;margin-top:8px">
           ${t.players.sort((a,b)=>a.num-b.num).map(p=>`
-          <div style="background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;color:var(--mt)">${p.num}번</span>
-            <span style="font-weight:600">${p.name}</span>
-            ${p.legacyPid?`<span style="font-size:10px;padding:2px 6px;background:rgba(0,196,255,.12);color:var(--ac);border-radius:4px">2026연동</span>`:''}
-            <button onclick="editPlayer('${t.id}','${p.id}')" style="background:none;border:none;color:var(--mt);cursor:pointer;font-size:12px">✏️</button>
-            <button onclick="deletePlayer('${t.id}','${p.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕</button>
-          </div>`).join('')}
-        </div>`:'<div style="color:var(--mt);font-size:13px">선수가 없습니다.</div>'}
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--mt);font-weight:600;min-width:36px">${p.num}번${p.num===5?'<span style="font-size:10px;color:var(--mt)"> 백업</span>':''}</span>
+              <input class="inp" value="${p.name}" onchange="renamePl27('${t.id}','${p.id}',this.value)"
+                style="flex:1">
+            </div>`).join('')}
+        </div>
+        ${S.legacyData?`
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)">
+          <div class="section-lbl" style="margin-bottom:8px">2026 시즌 연동 <span style="font-size:11px;color:var(--mt);font-weight:400">— 선수별 2026 기록 연결</span></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
+            ${t.players.sort((a,b)=>a.num-b.num).map(p=>{
+              const cur=p.legacyPid?S.legacyData.players.find(lp=>lp.pid===p.legacyPid):null;
+              return`<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span style="min-width:36px;color:var(--mt);font-weight:600">${p.num}번</span>
+                <span style="flex:1;font-weight:600">${p.name}</span>
+                <span style="color:${cur?'var(--ac)':'var(--mt)'};font-size:11px">${cur?cur.name+' ('+cur.teamName+')':'미연동'}</span>
+                <button onclick="openLegacyLinkModal('${t.id}','${p.id}')" class="btn btn-g btn-sm" style="font-size:11px;padding:3px 8px">연동</button>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`:''}
       </div>
-    </div>`).join('')}`;
+    </div>`;
+  }).join('');
 }
+
+function renameTm27(tid,v){
+  const t=S.teams.find(x=>x.id===tid);
+  if(t&&v.trim()){t.name=v.trim();_cacheInvalidate();saveToCloud();}
+}
+
+function renamePl27(tid,pid,v){
+  const t=S.teams.find(x=>x.id===tid);
+  if(!t)return;
+  const p=t.players.find(x=>x.id===pid);
+  if(p&&v.trim()){p.name=v.trim();_cacheInvalidate();saveToCloud();}
+}
+
+function setOrder27(tid,roundIdx,num){
+  const t=S.teams.find(x=>x.id===tid);
+  if(!t)return;
+  if(!t.order)t.order=[1,2,3,4];
+  t.order[roundIdx]=num;
+  saveToCloud();
+}
+
 
 function addTeam(){
   const name=prompt('팀 이름을 입력하세요:');
-  if(!name)return;
-  S.teams.push({id:uid(),name,div:1,order:[1,2,3,4,5],players:[]});
+  if(!name||!name.trim())return;
+  const tid=uid();
+  S.teams.push({id:tid,name:name.trim(),div:1,order:[1,2,3,4],
+    players:[1,2,3,4,5].map(n=>({id:uid(),name:'',num:n}))});
   saveToCloud();renderAdmin();
 }
 
-function editTeamName(tid){
-  const t=S.teams.find(t=>t.id===tid);if(!t)return;
-  const name=prompt('새 팀 이름:',t.name);
-  if(!name)return;
-  t.name=name;saveToCloud();renderAdmin();
-}
 
-function deleteTeam(tid){
-  if(!confirm('팀을 삭제하시겠습니까?'))return;
-  S.teams=S.teams.filter(t=>t.id!==tid);saveToCloud();renderAdmin();
-}
-
-function addPlayer(tid){
-  const t=S.teams.find(t=>t.id===tid);if(!t)return;
-  if(t.players.length>=5){alert('팀당 최대 5명까지 등록 가능합니다.');return;}
-  const name=prompt('선수 이름:');if(!name)return;
-  const usedNums=t.players.map(p=>p.num);
-  let num=1;while(usedNums.includes(num))num++;
-  num=parseInt(prompt('등번호 (1~5):',num)||num);
-  if(!num||num<1||num>5){alert('등번호는 1~5입니다.');return;}
-  if(t.players.some(p=>p.num===num)){alert('이미 사용 중인 등번호입니다.');return;}
-  const pid=uid();
-  t.players.push({id:pid,num,name});
-  // 2026 연동 여부 확인
-  if(S.legacyData&&S.legacyData.players.length){
-    const link=confirm('2026 시즌 기록과 연동할 선수가 있으면 "확인"을 누르세요.');
-    if(link)openLegacyLinkModal(tid,pid);
-  }
-  saveToCloud();renderAdmin();
-}
-
-function editPlayer(tid,pid){
-  const t=S.teams.find(t=>t.id===tid);if(!t)return;
-  const p=t.players.find(p=>p.id===pid);if(!p)return;
-  const name=prompt('선수 이름 수정:',p.name);
-  if(name)p.name=name;
-
-  // 2026 연동 관리
-  if(S.legacyData&&S.legacyData.players.length){
-    const cur=p.legacyPid?S.legacyData.players.find(lp=>lp.pid===p.legacyPid):null;
-    const choice=prompt(`2026 연동 선수: ${cur?cur.name+' ('+cur.teamName+')':'없음'}\n변경하려면 "변경", 해제하려면 "해제", 취소는 "취소":`,cur?'변경':'없음');
-    if(choice==='변경')openLegacyLinkModal(tid,pid);
-    else if(choice==='해제'){delete p.legacyPid;}
-  }
-  saveToCloud();renderAdmin();
-}
-
-function openLegacyLinkModal(tid,pid){
-  if(!S.legacyData)return;
-  const players=S.legacyData.players;
-  const opts=players.map(p=>`${p.pid}: ${p.name} (${p.teamName})`).join('\n');
-  const input=prompt('연동할 2026 선수 ID를 입력하세요 (목록):\n'+opts);
-  if(input)setLegacyLink(pid,input.trim());
-}
-
-function deletePlayer(tid,pid){
-  const t=S.teams.find(t=>t.id===tid);if(!t)return;
-  if(!confirm('선수를 삭제하시겠습니까?'))return;
-  t.players=t.players.filter(p=>p.id!==pid);saveToCloud();renderAdmin();
-}
-
-// ── 경기 일정 생성 모달 ──
 function openMatchGen(){
   const teams1=S.teams.filter(t=>t.div===1);
   if(teams1.length<2){alert('팀을 먼저 추가하세요.');return;}
