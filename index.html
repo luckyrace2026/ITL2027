@@ -3683,10 +3683,19 @@ function getAceStatsAll(pid){
       if(pid26){
         // A. matches에서 직접 계산 (가장 정확)
         if(S.legacyData.matches){
+          // fn.homeAce/awayAce는 pid 또는 등번호(num)로 저장될 수 있으므로,
+          // 2026 앱의 getAceStats와 동일하게 팀 로스터에서 id/num 둘 다로 조회한다.
+          const lp26=S.legacyData.players||[];
+          const resolveAcePid=(aceVal,teamId)=>{
+            if(aceVal==null)return null;
+            const found=lp26.find(lp=>lp.teamId===teamId&&(lp.pid===aceVal||lp.num===aceVal));
+            return found?found.pid:aceVal;
+          };
           for(const m of S.legacyData.matches){
             if(!m.result?.final)continue;
             const fn=m.result.final;
-            const isH=fn.homeAce===pid26,isA=fn.awayAce===pid26;
+            const isH=resolveAcePid(fn.homeAce,m.homeId)===pid26;
+            const isA=resolveAcePid(fn.awayAce,m.awayId)===pid26;
             if(!isH&&!isA)continue;
             if(fn.homeSec===null||fn.awaySec===null)continue;
             const rw=roundWinner(fn.homeSec,fn.awaySec,fn.homeMis,fn.awayMis);
